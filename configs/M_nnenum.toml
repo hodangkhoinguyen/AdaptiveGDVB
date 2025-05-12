@@ -46,7 +46,7 @@ name = 'MNIST'
 	memory = '128G'
 
 	[verify.verifiers]
-		SwarmHost = ['abcrown23g', 'neuralsatpp', 'marabou', 'nnenum']
+		SwarmHost = ['nnenum']
 
 	[verify.dispatch]
 		platform = "local"

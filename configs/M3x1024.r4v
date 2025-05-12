@@ -1,5 +1,5 @@
 [distillation]
-maxmemory="32G"
+maxmemory="128G"
 threshold=1e-9
 cuda=true
 type="classification"

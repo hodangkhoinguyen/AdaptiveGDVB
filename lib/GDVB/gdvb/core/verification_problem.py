@@ -550,7 +550,7 @@ class VerificationProblem:
                     self.settings.veri_log_dir,
                     f"{self.vp_name}_T={time_limit}_M={memory_limit}:{verifier.verifier_name}.out",
                 )
-                from swarmhost.core.problem import VerificationProblem as SHVP
+                from swarm_host.core.problem import VerificationProblem as SHVP
 
                 vp = SHVP(
                     self.settings.logger,
