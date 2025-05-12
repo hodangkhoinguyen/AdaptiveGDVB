@@ -8,9 +8,9 @@ conda env create --name adagdvb -f .env.d/env.yml
 git clone https://github.com/edwardxu0/GDVB.git $AdaGDVB/lib/GDVB
 conda env create --name gdvb -f $GDVB/.env.d/env.yml
 
-# R4V
-git clone https://github.com/edwardxu0/R4V.git $GDVB/lib/R4V
-conda env create --name r4v -f $R4V/.env.d/env.yml
+# R4V Run r4v with AdaGDVB env
+# git clone https://github.com/edwardxu0/R4V.git $GDVB/lib/R4V
+# conda env create --name r4v -f $R4V/.env.d/env.yml
 
 # SwarmHost
 git clone https://github.com/edwardxu0/SwarmHost.git $GDVB/lib/SwarmHost

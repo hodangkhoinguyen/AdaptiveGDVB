@@ -9,11 +9,13 @@
     git clone https://github.com/edwardxu0/GDVB.git $AdaGDVB/lib/GDVB
     conda env create --name gdvb -f $GDVB/.env.d/env.yml
     ```
-3. Install R4V
+
+<!-- Run r4v with AdaGDVB env -->
+<!-- 3. Install R4V
     ```
     git clone https://github.com/edwardxu0/R4V.git $GDVB/lib/R4V
     conda env create --name r4v -f $R4V/.env.d/env.yml
-    ```
+    ``` -->
 4. Install verification framework Swarmhost
     ```
     git clone https://github.com/edwardxu0/SwarmHost.git $GDVB/lib/SwarmHost
