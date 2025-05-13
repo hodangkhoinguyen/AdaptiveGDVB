@@ -467,12 +467,12 @@ class EvoBench:
             )
 
             # if self.verifier == "neurify" and self.explore_iter == 0:
-            #    pie_scatter = PieScatter2D(evo_step.times[verifier])
-            #    pie_scatter.heatmap(ticks_f1, ticks_f2, labels_f1, labels_f2)
+            pie_scatter = PieScatter2D(evo_step.times[verifier])
+            pie_scatter.heatmap(ticks_f1, ticks_f2, labels_f1, labels_f2)
 
-            #    pie_scatter.save(
-            #        f"{pdf_dir}/hm_{self.state}_{evo_step.iteration}_{evo_step.direction}.pdf"
-            #    )
+            pie_scatter.save(
+                f"{pdf_dir}/hm_{self.state}_{evo_step.iteration}_{evo_step.direction}.pdf"
+            )
 
         else:
             # plot two factors with properties: |F| >= 3
