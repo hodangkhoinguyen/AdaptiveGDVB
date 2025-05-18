@@ -52,8 +52,6 @@ class NeuralSat(Verifier):
                 elif "RuntimeError" in l:
                     veri_ans = 'error'
                     veri_time = -1
-                    print(self.verification_problem.paths["veri_log_path"])
-                    
                 elif "[!] Result:" in l:
                     veri_ans = l.strip().split()[-1]
                 elif "[!] Runtime:" in l:
