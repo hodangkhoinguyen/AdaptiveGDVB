@@ -6,7 +6,6 @@ from ..verifier_configs import VerifierConfigs
 
 class Marabou(Verifier):
     def __init__(self, verification_problem):
-        print("Marabou(Verifier) run")
         super().__init__(verification_problem)
         self.__name__ = "Marabou"
 

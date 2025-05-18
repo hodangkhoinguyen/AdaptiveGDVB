@@ -49,9 +49,9 @@ class NeuralSat(Verifier):
                 elif "CUDA out of memory" in l:
                     veri_ans = 'memout'
                     veri_time = -1
-                elif "RuntimeError" in l:
-                    veri_ans = 'error'
-                    veri_time = -1
+                # elif "RuntimeError" in l:
+                #     veri_ans = 'error'
+                #     veri_time = -1
                 elif "[!] Result:" in l:
                     veri_ans = l.strip().split()[-1]
                 elif "[!] Runtime:" in l:
