@@ -40,9 +40,14 @@ class NNEnum(Verifier):
                     veri_ans = "timeout"
                     veri_time = float(l[str.index(l, "(") + 1 : str.index(l, ")")])
 
+                if "time limit has been exceeded" in l:
+                    veri_ans = "timeout"
+                    veri_time = -1
+
                 error_pattern = [
                     "FloatingPointError: underflow encountered in multiply",
                     "underflow encountered in divide",
+                    "FloatingPointError: overflow encountered in float_scalars"
                 ]
                 if any([True for x in error_pattern if x in l]):
                     veri_ans = "error"
