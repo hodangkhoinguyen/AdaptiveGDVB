@@ -22,7 +22,7 @@ class ABCrown(Verifier):
         return
     
 
-    def run(self, config_path, model_path, property_path, log_path, time, memory):
+    def run(self, config_path, model_path, property_path, log_path, time):
         print("debug -- config path:", self.configs)
         if self.configs['version'] == 22:
             cmd = f"$SwarmHost/scripts/run_abcrown22.sh"
@@ -43,7 +43,7 @@ class ABCrown(Verifier):
 
         cmd += f" --onnx_path {model_path} --vnnlib_path {property_path} --timeout {time} --config $SwarmHost/swarm_host/verifiers/abcrown/abcrown.yml"
         print(cmd)
-        self.execute(cmd, log_path, time, memory)
+        self.execute(cmd, log_path, time)
 
     def analyze(self):
         """

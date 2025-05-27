@@ -11,11 +11,11 @@ class NNEnum(Verifier):
     def configure(self, config_path):
         ...
 
-    def run(self, config_path, model_path, property_path, log_path, time, memory):
+    def run(self, config_path, model_path, property_path, log_path, time):
         
         cmd = f"$SwarmHost/scripts/run_nnenum.sh $ROOT/{model_path} $ROOT/{property_path} {time}"
 
-        self.execute(cmd, log_path, time, memory)
+        self.execute(cmd, log_path, time)
 
     def analyze(self):
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:

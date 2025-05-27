@@ -12,13 +12,13 @@ class Marabou(Verifier):
     def configure(self, config_path):
         ...
 
-    def run(self, config_path, model_path, property_path, log_path, time, memory):
+    def run(self, config_path, model_path, property_path, log_path, time):
         
         cmd = f"$SwarmHost/scripts/run_marabou.sh"
         cmd += f" {model_path} {property_path} --num-workers=64"
         self.logger.info(f'Verifying: {cmd}')
         
-        self.execute(cmd, log_path, time, memory)
+        self.execute(cmd, log_path, time)
 
     def analyze(self):
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:

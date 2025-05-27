@@ -104,11 +104,10 @@ class VerificationProblem:
         property_path = self.property.property_path
         log_path = self.paths["veri_log_path"]
         time = self.verifier_config["time"]
-        memory = self.verifier_config["memory"]
         
         self.verifier.configure(config_path)
         
-        return self.verifier.run(config_path, model_path, property_path, log_path, time, memory)
+        return self.verifier.run(config_path, model_path, property_path, log_path, time)
 
     def analyze(self):
         return self.verifier.analyze()

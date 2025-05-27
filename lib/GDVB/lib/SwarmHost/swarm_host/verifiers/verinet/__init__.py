@@ -15,14 +15,14 @@ class Verinet(Verifier):
     def configure(self, config_path):
         ...
     
-    def run(self, config_path, model_path, property_path, log_path, time, memory):
+    def run(self, config_path, model_path, property_path, log_path, time):
         
         input_shape = ' '.join(str(x) for x in self.verification_problem.property.shape)
 
         cmd = f"$SwarmHost/scripts/run_verinet.sh $ROOT/{model_path} $ROOT/{property_path} {time} --input_shape {input_shape}"
         
         print(cmd)
-        self.execute(cmd, log_path, time, memory)
+        self.execute(cmd, log_path, time)
 
     def analyze(self):
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:

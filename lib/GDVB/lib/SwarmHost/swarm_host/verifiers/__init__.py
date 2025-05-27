@@ -9,10 +9,10 @@ class Verifier:
         self.logger = verification_problem.logger
         self.RES_MONITOR_PRETIME = 200
 
-    def execute(self, cmd, log_path, time, memory):
+    def execute(self, cmd, log_path, time):
         res_monitor_path = os.path.join(os.environ["SwarmHost"], "lib", "resmonitor.py")
         cmd = (
-            f"python3 {res_monitor_path} -T {time+self.RES_MONITOR_PRETIME} -M {memory} "
+            f"python3 {res_monitor_path} -T {time+self.RES_MONITOR_PRETIME} "
             + cmd
         )
 

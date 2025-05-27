@@ -446,18 +446,17 @@ class VerificationProblem:
         # added 60 for DNNV load time
 
         time_limit = configs_v["time"]
-        memory_limit = configs_v["memory"]
 
         dnnv_wb_flag = "_wb" if isinstance(verifier, DNNV_wb) else ""
         self.veri_log_path = os.path.join(
             self.settings.veri_log_dir,
-            f"{self.vp_name}_T={time_limit}_M={memory_limit}:{verifier.verifier_name}{dnnv_wb_flag}.out",
+            f"{self.vp_name}_T={time_limit}:{verifier.verifier_name}{dnnv_wb_flag}.out",
         )
 
         if configs_v["dispatch"]["platform"] == "slurm":
             slurm_script_path = os.path.join(
                 self.settings.veri_slurm_dir,
-                f"{self.vp_name}_T={time_limit}_M={memory_limit}:{verifier.verifier_name}{dnnv_wb_flag}.slurm",
+                f"{self.vp_name}_T={time_limit}:{verifier.verifier_name}{dnnv_wb_flag}.slurm",
             )
         else:
             slurm_script_path = None
@@ -479,14 +478,14 @@ class VerificationProblem:
         ### Verifier frameworks
         # DNNV family executor
         if any(isinstance(verifier, x) for x in [DNNV, DNNV_wb, DNNF]):
-            cmd = f"python -W ignore $DNNV/tools/resmonitor.py -q -T {time_limit+60} -M {memory_limit} "
+            cmd = f"python -W ignore $DNNV/tools/resmonitor.py -q -T {time_limit+60} "
             cmd += verifier.execute([property_path, "--network N", self.dis_model_path])
 
         # SwarmHost executor
         elif isinstance(verifier, SwarmHost):
             self.veri_config_path = os.path.join(
                 self.settings.veri_config_dir,
-                f"{self.vp_name}_T={time_limit}_M={memory_limit}:{verifier.verifier_name}{dnnv_wb_flag}.yaml",
+                f"{self.vp_name}_T={time_limit}:{verifier.verifier_name}{dnnv_wb_flag}.yaml",
             )
             data_config = self.distillation_config["distillation"]["data"]["transform"][
                 "student"
@@ -503,7 +502,6 @@ class VerificationProblem:
                     f"--property_dir {self.prop_dir}",
                     f"--veri_config_path {self.veri_config_path}",
                     f"-t {time_limit}",
-                    f"-m {memory_limit}",
                     f"--p_mean {p_mean}",
                     f"--p_std {p_std}",
                     f"--p_mrb",
@@ -543,12 +541,11 @@ class VerificationProblem:
                 verifiers += [verifier]
 
         time_limit = configs_v["time"]
-        memory_limit = configs_v["memory"]
         for verifier in verifiers:
             if isinstance(verifier, SwarmHost):
                 log_path = os.path.join(
                     self.settings.veri_log_dir,
-                    f"{self.vp_name}_T={time_limit}_M={memory_limit}:{verifier.verifier_name}.out",
+                    f"{self.vp_name}_T={time_limit}:{verifier.verifier_name}.out",
                 )
                 from swarm_host.core.problem import VerificationProblem as SHVP
 
@@ -565,7 +562,7 @@ class VerificationProblem:
                 dnnv_wb_flag = "_wb" if isinstance(verifier, DNNV_wb) else ""
                 log_path = os.path.join(
                     self.settings.veri_log_dir,
-                    f"{self.vp_name}_T={time_limit}_M={memory_limit}:{verifier.verifier_name}{dnnv_wb_flag}.out",
+                    f"{self.vp_name}_T={time_limit}:{verifier.verifier_name}{dnnv_wb_flag}.out",
                 )
 
                 if not os.path.exists(log_path):

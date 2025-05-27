@@ -14,11 +14,11 @@ class MNBab(Verifier):
         vc.save_configs(config_path)
         self.logger.debug(f"Verification config saved to: {config_path}")
 
-    def run(self, config_path, model_path, property_path, log_path, time, memory):
+    def run(self, config_path, model_path, property_path, log_path, time):
 
         cmd = f"$SwarmHost/scripts/run_mnbab.sh --config $ROOT/{config_path} --onnx_path $ROOT/{model_path} --vnnlib_path $ROOT/{property_path} --timeout {time}"
         
-        self.execute(cmd, log_path, time, memory)
+        self.execute(cmd, log_path, time)
 
     def analyze(self):
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:
