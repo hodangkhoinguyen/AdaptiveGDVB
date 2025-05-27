@@ -24,7 +24,7 @@ class NNEnum(Verifier):
         veri_ans, veri_time = super().pre_analyze(lines)
 
         if not (veri_ans and veri_time):
-            for l in lines[-100:]:
+            for l in lines:
                 if "Result: network is SAFE" in l:
                     veri_ans = "unsat"
                 elif "Result: network is UNSAFE with confirmed counterexample" in l:

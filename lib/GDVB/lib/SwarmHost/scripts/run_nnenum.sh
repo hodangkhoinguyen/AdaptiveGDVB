@@ -16,3 +16,4 @@
 # conda deactivate
 cd $SwarmHost/lib/nnenum/src/
 conda run -n nnenum python -m nnenum.nnenum $@
+cd $PROJECT_ROOT
