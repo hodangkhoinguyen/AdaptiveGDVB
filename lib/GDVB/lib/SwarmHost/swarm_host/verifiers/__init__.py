@@ -45,6 +45,9 @@ class Verifier:
             elif "Model does not exist" in l:
                 veri_ans = 'hardware_limit'
                 veri_time = -1
+            elif "exceeds maximum protobuf size of 2GB" in l:
+                veri_ans = 'hardware_limit'
+                veri_time = -1
 
         return veri_ans, veri_time
 
