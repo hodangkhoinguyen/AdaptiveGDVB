@@ -43,7 +43,6 @@ name = 'MNIST'
 [verify]
 	eps = 0.02
 	time = 600
-	memory = '128G'
 
 	[verify.verifiers]
 		SwarmHost = ['marabou']
