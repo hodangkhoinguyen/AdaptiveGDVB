@@ -62,7 +62,7 @@ class Verifier:
         the logger print out in between line of logging file which affect the analysis process
         rewrite lines to put INFO into a new line
     """
-    def reformat_lines(lines):
+    def reformat_lines(self, lines):
         new_lines = []
         i = 0
         size = len(lines)
