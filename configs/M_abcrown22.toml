@@ -45,7 +45,7 @@ name = 'MNIST'
 	time = 600
 
 	[verify.verifiers]
-		SwarmHost = ['abcrown22g']
+		SwarmHost = ['abcrown22']
 
 	[verify.dispatch]
 		platform = "local"
