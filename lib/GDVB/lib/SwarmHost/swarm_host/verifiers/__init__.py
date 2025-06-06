@@ -56,3 +56,32 @@ class Verifier:
             answer = 'timeout'
             time = self.verification_problem.verifier_config["time"]
         return answer, time
+
+    """
+    Helper function:
+        the logger print out in between line of logging file which affect the analysis process
+        rewrite lines to put INFO into a new line
+    """
+    def reformat_lines(lines):
+        new_lines = []
+        i = 0
+        size = len(lines)
+        while i < size:
+            line = lines[i]
+            if "INFO" in line and "(resmonitor)" in line and not line.startswith("INFO"):
+                curr = line
+                regular, info = curr.split("INFO     ")
+                info = "INFO     " + info
+                i += 1
+                new_lines.append(info)
+                while lines[i].startswith("INFO"):
+                    new_lines.append(lines[i])
+                    i += 1
+                regular += lines[i]
+                new_lines.append(regular)
+                i += 1
+                continue
+            new_lines.append(line)
+            i += 1
+
+        return new_lines

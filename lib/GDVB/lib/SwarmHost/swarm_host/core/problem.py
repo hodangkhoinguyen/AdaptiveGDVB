@@ -27,39 +27,28 @@ class VerificationProblem:
 
     def init_verifiers(self, verifier):
         match verifier:
-            case "acrown22":
-                configs = {
-                    'version': 22,
-                    'beta': False,
-                    'gpu': False
-                }
-                v = ABCrown(self, configs)
-            case "abcrown":
-                configs = {
-                    'version': 22,
-                    'beta': True,
-                    'gpu': False
-                }
-                v = ABCrown(self, configs)
             case "abcrown22":
                 configs = {
                     'version': 22,
                     'beta': True,
-                    'gpu': False
                 }
                 v = ABCrown(self, configs)
             case "abcrown23":
                 configs = {
                     'version': 23,
                     'beta': True,
-                    'gpu': False
                 }
                 v = ABCrown(self, configs)
-            case "abcrown23g":
+            case "abcrown24":
                 configs = {
-                    'version': 23,
+                    'version': 24,
                     'beta': True,
-                    'gpu': True
+                }
+                v = ABCrown(self, configs)
+            case "abcrown25":
+                configs = {
+                    'version': 25,
+                    'beta': True,
                 }
                 v = ABCrown(self, configs)
             case "mnbab":
