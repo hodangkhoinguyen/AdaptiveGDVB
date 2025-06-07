@@ -1,19 +1,3 @@
-#########################################################################
-##   This file is part of the auto_LiRPA library, a core part of the   ##
-##   α,β-CROWN (alpha-beta-CROWN) neural network verifier developed    ##
-##   by the α,β-CROWN Team                                             ##
-##                                                                     ##
-##   Copyright (C) 2020-2025 The α,β-CROWN Team                        ##
-##   Primary contacts: Huan Zhang <huan@huan-zhang.com> (UIUC)         ##
-##                     Zhouxing Shi <zshi@cs.ucla.edu> (UCLA)          ##
-##                     Xiangru Zhong <xiangru4@illinois.edu> (UIUC)    ##
-##                                                                     ##
-##    See CONTRIBUTORS for all author contacts and affiliations.       ##
-##                                                                     ##
-##     This program is licensed under the BSD 3-Clause License,        ##
-##        contained in the LICENCE file in this directory.             ##
-##                                                                     ##
-#########################################################################
 from torch.nn import DataParallel
 from .perturbations import *
 from .bounded_tensor import BoundedTensor
@@ -138,8 +122,6 @@ class BoundDataParallel(DataParallel):
         # add 'module.' here before each keys in self.module.state_dict() if needed
         return self.module.state_dict(destination=destination, prefix=prefix, keep_vars=keep_vars)
 
-    def _named_members(self, get_members_fn, prefix='', recurse=True, remove_duplicate: bool = True):
-        return self.module._named_members(get_members_fn, prefix, recurse, remove_duplicate)
+    def _named_members(self, get_members_fn, prefix='', recurse=True):
+        return self.module._named_members(get_members_fn, prefix, recurse)
 
-    def __getitem__(self, name):
-        return self.module[name]

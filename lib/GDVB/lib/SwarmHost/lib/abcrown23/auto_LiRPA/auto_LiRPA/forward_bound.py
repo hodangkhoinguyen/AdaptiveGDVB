@@ -1,19 +1,3 @@
-#########################################################################
-##   This file is part of the auto_LiRPA library, a core part of the   ##
-##   α,β-CROWN (alpha-beta-CROWN) neural network verifier developed    ##
-##   by the α,β-CROWN Team                                             ##
-##                                                                     ##
-##   Copyright (C) 2020-2025 The α,β-CROWN Team                        ##
-##   Primary contacts: Huan Zhang <huan@huan-zhang.com> (UIUC)         ##
-##                     Zhouxing Shi <zshi@cs.ucla.edu> (UCLA)          ##
-##                     Xiangru Zhong <xiangru4@illinois.edu> (UIUC)    ##
-##                                                                     ##
-##    See CONTRIBUTORS for all author contacts and affiliations.       ##
-##                                                                     ##
-##     This program is licensed under the BSD 3-Clause License,        ##
-##        contained in the LICENCE file in this directory.             ##
-##                                                                     ##
-#########################################################################
 import torch
 import warnings
 from .bound_ops import *
@@ -29,10 +13,11 @@ import sys
 sys.setrecursionlimit(1000000)
 
 
-def forward_general(self: 'BoundedModule', C=None, node:'Bound'=None, concretize=False,
+def forward_general(self: 'BoundedModule', C=None, node=None, concretize=False,
                     offset=0):
-    if self.dynamic:
-        return self.forward_general_dynamic(C=C, node=node, concretize=concretize, offset=offset)
+    if self.bound_opts['dynamic_forward']:
+        return self.forward_general_dynamic(C, node, concretize, offset)
+
     if C is None:
         if hasattr(node, 'linear'):
             return node.linear.lower, node.linear.upper
@@ -41,7 +26,7 @@ def forward_general(self: 'BoundedModule', C=None, node:'Bound'=None, concretize
             return node.value, node.value
         if not node.perturbed:
             node.lower = node.upper = self.get_forward_value(node)
-        if node.is_lower_bound_current():
+        if hasattr(node, 'lower'):
             node.linear = LinearBound(None, node.lower, None, node.upper, node.lower, node.upper)
             return node.lower, node.upper
 
@@ -111,7 +96,7 @@ def forward_general(self: 'BoundedModule', C=None, node:'Bound'=None, concretize
         return lower, upper
 
 
-def forward_general_dynamic(self: 'BoundedModule', C=None, node:'Bound'=None,
+def forward_general_dynamic(self: 'BoundedModule', C=None, node=None,
                             concretize=False, offset=0):
     max_dim = self.bound_opts['forward_max_dim']
 
@@ -152,7 +137,7 @@ def forward_general_dynamic(self: 'BoundedModule', C=None, node:'Bound'=None,
                     None, node.value, None, node.value, node.value, node.value)
                 return node.linear
         if not node.perturbed:
-            if not node.is_lower_bound_current():
+            if not hasattr(node, 'lower'):
                 node.lower = node.upper = self.get_forward_value(node)
             if concretize:
                 return node.lower, node.upper
@@ -170,8 +155,8 @@ def forward_general_dynamic(self: 'BoundedModule', C=None, node:'Bound'=None,
     inp = []
     for l_pre in node.inputs:
         linear_inp = self.forward_general_dynamic(node=l_pre, offset=offset)
-        linear_inp.lower = l_pre.lower
-        linear_inp.upper = l_pre.upper
+        linear_inp.lower = getattr(l_pre, 'lower', None)
+        linear_inp.upper = getattr(l_pre, 'upper', None)
         inp.append(linear_inp)
     node._start = '_forward'
     if (C is not None and isinstance(node, BoundLinear) and
@@ -276,10 +261,11 @@ def init_forward(self: 'BoundedModule', roots, dim_in):
     prev_dim_in = 0
     # Assumption: roots[0] is the input node which implies batch_size
     batch_size = roots[0].value.shape[0]
+    dynamic = self.bound_opts['dynamic_forward']
     for i in range(len(roots)):
         if hasattr(roots[i], 'perturbation') and roots[i].perturbation is not None:
             shape = roots[i].linear.lw.shape
-            if self.dynamic:
+            if dynamic:
                 if shape[1] != dim_in:
                     raise NotImplementedError('Dynamic forward bound is not supported yet when there are multiple perturbed inputs.')
                 ptb = roots[i].perturbation

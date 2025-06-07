@@ -1,23 +1,4 @@
-#########################################################################
-##   This file is part of the auto_LiRPA library, a core part of the   ##
-##   α,β-CROWN (alpha-beta-CROWN) neural network verifier developed    ##
-##   by the α,β-CROWN Team                                             ##
-##                                                                     ##
-##   Copyright (C) 2020-2025 The α,β-CROWN Team                        ##
-##   Primary contacts: Huan Zhang <huan@huan-zhang.com> (UIUC)         ##
-##                     Zhouxing Shi <zshi@cs.ucla.edu> (UCLA)          ##
-##                     Xiangru Zhong <xiangru4@illinois.edu> (UIUC)    ##
-##                                                                     ##
-##    See CONTRIBUTORS for all author contacts and affiliations.       ##
-##                                                                     ##
-##     This program is licensed under the BSD 3-Clause License,        ##
-##        contained in the LICENCE file in this directory.             ##
-##                                                                     ##
-#########################################################################
-from types import SimpleNamespace
-
 import torch
-from torch.autograd import Function
 
 from .activation_base import BoundActivation
 from .nonlinear import BoundOptimizableNonLinear
@@ -35,6 +16,7 @@ class BoundSin(BoundOptimizableNonLinear):
     def __init__(self, attr=None, inputs=None, output_index=0, options=None):
         super().__init__(attr, inputs, output_index, options)
         self.ibp_intermediate = True
+        self.use_precompute = True
         self.act_func = torch.sin
         self.d_act_func = torch.cos
 
@@ -44,7 +26,8 @@ class BoundSin(BoundOptimizableNonLinear):
 
         self.all_table_x = torch.linspace(
             0, 2 * torch.pi, BoundSin.n_table_entries, device=self.device)
-        self.precompute_relaxation(self.act_func, self.d_act_func, x_limit = torch.pi / 2)
+        if self.use_precompute:
+            self.precompute_relaxation(self.act_func, self.d_act_func, x_limit = torch.pi / 2)
         if BoundSin.xl_lower_tb is None:
             # Generate look-up tables.
             BoundSin.xl_lower_tb = BoundSin.get_lower_left_bound(self.all_table_x)
@@ -63,16 +46,18 @@ class BoundSin(BoundOptimizableNonLinear):
         alpha.data[:4] = ((l + u) / 2).unsqueeze(0).expand(4, *shape)
         alpha.data[4:6] = self.tp_both_lower_init[name_start].expand(2, *shape)
         alpha.data[6:8] = self.tp_both_upper_init[name_start].expand(2, *shape)
-        alpha.data[8:10] = self.tp_lower_init[name_start].expand(2, *shape)
-        alpha.data[10:12] = self.tp_upper_init[name_start].expand(2, *shape)
+        alpha.data[8:10] = self.tp_left_lower_init[name_start].expand(2, *shape)
+        alpha.data[10:12] = self.tp_left_upper_init[name_start].expand(2, *shape)
         return alpha
 
     def opt_init(self):
         super().opt_init()
         self.tp_both_lower_init = {}
         self.tp_both_upper_init = {}
-        self.tp_lower_init = {}
-        self.tp_upper_init = {}
+        self.tp_left_lower_init = {}
+        self.tp_left_upper_init = {}
+        self.tp_right_lower_init = {}
+        self.tp_right_upper_init = {}
 
     def generate_inflections(self, lb, ub):
         return
@@ -83,7 +68,7 @@ class BoundSin(BoundOptimizableNonLinear):
         ub_cycles = torch.floor((ub + 0.5 * torch.pi) / (2 * torch.pi)) * (2 * torch.pi)
         ub_clamped = ub - ub_cycles
 
-        self.sigmoid_like_mask = ub - lb <= torch.pi
+        self.sigmoid_like_mask = (ub - lb <= torch.pi)
         self.sigmoid_like_mask = torch.logical_and(self.sigmoid_like_mask, torch.logical_or(
             torch.logical_and(lb_clamped <= 0.5 * torch.pi, ub_clamped <= 0.5 * torch.pi),
             torch.logical_and(lb_clamped >= 0.5 * torch.pi, ub_clamped >= 0.5 * torch.pi)))
@@ -97,7 +82,10 @@ class BoundSin(BoundOptimizableNonLinear):
             self.sigmoid_like_mask))
         self.mask_both = torch.logical_xor(self.sigmoid_like_mask,
             torch.logical_or(self.mask_neg, self.mask_pos))
-        self.convex_concave = self.d2_act_func(lb) >= 0
+
+        self.convex_concave = torch.logical_and(self.mask_both,
+            (self.d2_act_func(lb) >= 0))
+        self.concave_convex = torch.logical_xor(self.mask_both, self.convex_concave)
 
     def generate_d_lower_upper(self, lower, upper):
         # Indices of neurons with input upper bound >=0, whose optimal slope to lower bound the function was pre-computed.
@@ -105,24 +93,22 @@ class BoundSin(BoundOptimizableNonLinear):
         k_tensor = torch.floor(upper / (2 * torch.pi))
         upper_clamped = upper - k_tensor * (2 * torch.pi)
         case1_mask = torch.logical_and(upper_clamped >= 0, upper_clamped <= torch.pi / 2)
-        upper_clamped_new = upper_clamped.clamp(min=0, max=torch.pi / 2)
+        upper_clamped_new = upper_clamped.clamp(min=0, max=(torch.pi / 2))
         index = torch.max(
             torch.zeros(upper.numel(), dtype=torch.long, device=upper.device),
             (upper_clamped_new / self.step_pre).to(torch.long).reshape(-1)
         ) + 1
         # Lookup the lower bound slope from the pre-computed table.
-        d_lower = (torch.index_select(self.d_lower, 0, index).view(lower.shape)
-                   + k_tensor * 2 * torch.pi) * case1_mask
+        d_lower = (torch.index_select(self.d_lower, 0, index).view(lower.shape) + k_tensor * 2 * torch.pi) * case1_mask
 
         case2_mask = torch.logical_and(upper_clamped >= torch.pi, upper_clamped <= 3 * torch.pi / 2)
-        upper_clamped_new = upper_clamped.clamp(min=torch.pi, max=3 * torch.pi / 2)
+        upper_clamped_new = upper_clamped.clamp(min=torch.pi, max=(3 * torch.pi / 2))
         index = torch.max(
             torch.zeros(upper.numel(), dtype=torch.long, device=upper.device),
             ((torch.pi - upper_clamped_new) / -self.step_pre).to(torch.long).reshape(-1)
         ) + 1
         # Lookup the lower bound slope from the pre-computed table.
-        d_upper = (torch.pi - torch.index_select(self.d_upper, 0, index).view(lower.shape)
-                   + k_tensor * 2 * torch.pi) * case2_mask
+        d_upper = (torch.pi - torch.index_select(self.d_upper, 0, index).view(lower.shape) + k_tensor * 2 * torch.pi) * case2_mask
 
         # Indices of neurons with lower bound <=0, whose optimal slope to upper bound the function was pre-computed.
         k_tensor = torch.floor(lower / (2 * torch.pi))
@@ -133,8 +119,7 @@ class BoundSin(BoundOptimizableNonLinear):
             torch.zeros(lower.numel(), dtype=torch.long, device=lower.device),
             ((lower_clamped_new - 2 * torch.pi) / -self.step_pre).to(torch.long).reshape(-1)
         ) + 1
-        d_upper += (torch.index_select(self.d_upper, 0, index).view(upper.shape)
-                    + (k_tensor + 1) * 2 * torch.pi) * case3_mask
+        d_upper += (torch.index_select(self.d_upper, 0, index).view(upper.shape) + (k_tensor + 1) * 2 * torch.pi) * case3_mask
 
         case4_mask = torch.logical_and(lower_clamped >= torch.pi / 2, lower_clamped <= torch.pi)
         lower_clamped_new = lower_clamped.clamp(min=(torch.pi / 2), max=3 * torch.pi)
@@ -142,9 +127,18 @@ class BoundSin(BoundOptimizableNonLinear):
             torch.zeros(lower.numel(), dtype=torch.long, device=lower.device),
             ((torch.pi - lower_clamped_new) / self.step_pre).to(torch.long).reshape(-1)
         ) + 1
-        d_lower += (torch.pi - torch.index_select(self.d_lower, 0, index).view(upper.shape)
-                    + k_tensor * 2 * torch.pi) * case4_mask
+        d_lower += (torch.pi - torch.index_select(self.d_lower, 0, index).view(upper.shape) + k_tensor * 2 * torch.pi) * case4_mask
         return d_lower, d_upper
+
+    @staticmethod
+    def n_crossing(start, end, s):
+        """Check how many times we will encounter value s + k*2*pi within start and end for any integer k."""
+        cycles = torch.floor((end - start) / (2 * torch.pi))  # Number of 2pi cycles.
+        # Move s and end to the same 2 * pi cycle as start.
+        dist = torch.floor((s - start) / (2 * torch.pi))
+        real_s = s - dist * 2 * torch.pi
+        real_end = end - cycles * 2 * torch.pi
+        return (real_s >= start).to(s) * (real_s <= real_end).to(s) + cycles
 
     @staticmethod
     def arcsin(c):
@@ -171,16 +165,6 @@ class BoundSin(BoundOptimizableNonLinear):
         crossing1 = BoundSin.arcsin(c) - theta
         crossing2 = torch.pi - crossing1 - 2 * theta  # Problematic at exact 1/2 pi, but ok in our case (happens only when lb=ub).
         return BoundSin.n_crossing(start, end, crossing1) + BoundSin.n_crossing(start, end, crossing2)
-
-    @staticmethod
-    def n_crossing(start, end, s):
-        """Check how many times we will encounter value s + k*2*pi within start and end for any integer k."""
-        cycles = torch.floor((end - start) / (2 * torch.pi))  # Number of 2pi cycles.
-        # Move s and end to the same 2 * pi cycle as start.
-        dist = torch.floor((s - start) / (2 * torch.pi))
-        real_s = s - dist * 2 * torch.pi
-        real_end = end - cycles * 2 * torch.pi
-        return (real_s >= start).to(s) * (real_s <= real_end).to(s) + cycles
 
     @staticmethod
     def check_bound(tangent_point, x):
@@ -269,7 +253,6 @@ class BoundSin(BoundOptimizableNonLinear):
 
     def get_bound_tb(self, lb, ub):
         """Find lower or upper bounds from lookup table."""
-        lower, upper = lb, ub
         step = 2 * torch.pi / (BoundSin.n_table_entries - 1)
         # Move to 0 to 2 pi region.
         lb_cycles = torch.floor(lb / (2 * torch.pi)) * (2 * torch.pi)
@@ -296,59 +279,14 @@ class BoundSin(BoundOptimizableNonLinear):
             tangent_lower = self.alpha[ns][8:10, :]
             tangent_upper = self.alpha[ns][10:12, :]
         else:
-            # add cycles to optimizable tangent region
-            unfolded_left_lower = (tangent_left_lower +
-                BoundSin.xl_lower_tb[1][indices_lb] + lb_cycles)
-            left_lower_ends = 1.5*torch.pi + BoundSin.xl_lower_tb[1][indices_lb] + lb_cycles
-            unfolded_right_lower = (tangent_right_lower +
-                BoundSin.xu_lower_tb[1][indices_ub] + ub_cycles)
-            right_lower_ends = 1.5*torch.pi + BoundSin.xu_lower_tb[1][indices_ub] + ub_cycles
-            mid = (lower + upper) / 2
-
-            leftmost_mask = torch.logical_and(mid < unfolded_left_lower,
-                unfolded_left_lower <= upper)
-            left_range_mask = torch.logical_and(mid >= unfolded_left_lower,
-                mid <= left_lower_ends)
-            inbetween_mask = torch.logical_and(mid > left_lower_ends,
-                mid < right_lower_ends)
-            rightmost_mask = torch.logical_and(mid > unfolded_right_lower,
-                unfolded_right_lower >= lower)
-            right_range_mask = torch.logical_and(mid >= right_lower_ends,
-                mid <= unfolded_right_lower)
-
-            tangent_lower = (leftmost_mask * tangent_left_lower +
-                left_range_mask * (mid - BoundSin.xl_lower_tb[1][indices_lb] - lb_cycles) +
-                inbetween_mask * 1.5*torch.pi + rightmost_mask * tangent_right_lower +
-                right_range_mask * (mid - BoundSin.xu_lower_tb[1][indices_ub] - ub_cycles))
-
-            unfolded_left_upper = (tangent_left_upper +
-                BoundSin.xl_upper_tb[1][indices_lb] + lb_cycles)
-            left_upper_ends = 2.5*torch.pi + BoundSin.xl_upper_tb[1][indices_lb] + lb_cycles
-            unfolded_right_upper = (tangent_right_upper +
-                BoundSin.xu_upper_tb[1][indices_ub] + ub_cycles)
-            right_upper_ends = 2.5*torch.pi + BoundSin.xu_upper_tb[1][indices_ub] + ub_cycles
-            mid = (lower + upper) / 2
-
-            leftmost_mask = torch.logical_and(mid < unfolded_left_upper,
-                unfolded_left_upper <= upper)
-            left_range_mask = torch.logical_and(mid >= unfolded_left_upper,
-                mid <= left_upper_ends)
-            inbetween_mask = torch.logical_and(mid > left_upper_ends,
-                mid < right_upper_ends)
-            rightmost_mask = torch.logical_and(mid > unfolded_right_upper,
-                unfolded_right_upper >= lower)
-            right_range_mask = torch.logical_and(mid >= right_upper_ends,
-                mid <= unfolded_right_upper)
-
-            tangent_upper = (leftmost_mask * tangent_left_upper +
-                left_range_mask * (mid - BoundSin.xl_upper_tb[1][indices_lb] - lb_cycles) +
-                inbetween_mask * 2.5*torch.pi + rightmost_mask * tangent_right_upper +
-                right_range_mask * (mid - BoundSin.xu_upper_tb[1][indices_ub] - ub_cycles))
-
+            tangent_lower = (tangent_left_lower + tangent_right_lower) / 2
+            tangent_upper = (tangent_left_upper + tangent_right_upper) / 2
             if self.opt_stage == 'init':
                 ns = self._start
-                self.tp_lower_init[ns] = tangent_lower.detach()
-                self.tp_upper_init[ns] = tangent_upper.detach()
+                self.tp_left_lower_init[ns] = tangent_left_lower.detach()
+                self.tp_left_upper_init[ns] = tangent_left_upper.detach()
+                self.tp_right_lower_init[ns] = tangent_right_lower.detach()
+                self.tp_right_upper_init[ns] = tangent_right_upper.detach()
 
         d_lower = BoundSin.d_func(tangent_lower)
         b_lower = BoundSin.func(tangent_lower) - d_lower * (tangent_lower +
@@ -382,7 +320,7 @@ class BoundSin(BoundOptimizableNonLinear):
         lb = - min_mask + (1 - min_mask) * lb
         return lb, ub
 
-    def bound_relax_branch(self, lb, ub):
+    def bound_relax_impl(self, lb, ub):
         dtype = lb.dtype
 
         ub = torch.max(ub, lb + 1e-8)
@@ -394,14 +332,17 @@ class BoundSin(BoundOptimizableNonLinear):
         smid = self.func((ub + lb) / 2)
         gap = smid - mid
 
-        case1_line_slope = (sub - slb) / (ub - lb).clamp(min=1e-10)
+        min_preact = 1e-3
+        mask_close = (ub - lb) < min_preact
+        case1_line_slope = torch.where(mask_close, self.d_act_func(ub),
+            (sub - slb) / (ub - lb).clamp(min=1e-10))
         case1_line_bias = slb - case1_line_slope * lb
         # Check if there are crossings between the line and the sin function.
         grad_crossings = self.get_intersection(lb, ub, case1_line_slope, theta=0.5 * torch.pi)
         # If there is no crossing, then we can connect the two points together as a lower/upper bound.
         use_line = grad_crossings == 1
         # Connected line is the upper bound.
-        upper_use_line = torch.logical_and(gap < 0, use_line)
+        upper_use_line = torch.logical_and(gap <  0, use_line)
         # Connected line is the lower bound.
         lower_use_line = torch.logical_and(gap >= 0, use_line)
 
@@ -425,6 +366,7 @@ class BoundSin(BoundOptimizableNonLinear):
 class BoundCos(BoundSin):
     def __init__(self, attr=None, inputs=None, output_index=0, options=None):
         super().__init__(attr, inputs, output_index, options)
+
         self.ibp_max_point = 0.0
         self.ibp_min_point = torch.pi
 
@@ -432,14 +374,26 @@ class BoundCos(BoundSin):
         return torch.cos(x)
 
     def bound_relax(self, x, init=False, dim_opt=None):
+        if init:
+            self.init_linear_relaxation(x, dim_opt)
         # Shift the input by half_pi, and shifting the linear bounds back.
         half_pi = 0.5 * torch.pi
-        x_shifted = SimpleNamespace()
-        x_shifted.lower = x.lower + half_pi
-        x_shifted.upper = x.upper + half_pi
-        super().bound_relax(x_shifted, init=init, dim_opt=dim_opt)
-        self.lb = self.lb + self.lw * half_pi
-        self.ub = self.ub + self.uw * half_pi
+        lb = x.lower + half_pi
+        ub = x.upper + half_pi
+        self.generate_inflections(lb, ub)
+        self.branch_input_domain(lb, ub)
+        self.bound_relax_impl_sigmoid(lb, ub, self.act_func, self.d_act_func)
+        if self.opt_stage is None and self.sigmoid_like_mask.all():
+            self.lb = self.lw * half_pi + self.lb
+            self.ub = self.uw * half_pi + self.ub
+            return
+        lower_slope, lower_bias, upper_slope, upper_bias = self.bound_relax_impl(lb, ub)
+        self.lw = self.lw * self.sigmoid_like_mask + self.branch_mask * lower_slope
+        self.lb = (self.sigmoid_like_mask * (self.lw * half_pi + self.lb)
+                   + self.branch_mask * (lower_slope * half_pi + lower_bias))
+        self.uw = self.uw * self.sigmoid_like_mask + self.branch_mask * upper_slope
+        self.ub = (self.sigmoid_like_mask * (self.uw * half_pi + self.ub)
+                   + self.branch_mask * (upper_slope * half_pi + upper_bias))
 
 
 class BoundSec(BoundActivation):
@@ -482,33 +436,3 @@ class BoundSec(BoundActivation):
         lower = (h_U < 0) * (y_U - 1) + (h_L > 0) * (y_L - 1) + 1
         upper = torch.max(y_L, y_U)
         return lower, upper
-
-
-class SinGradOp(Function):
-    @staticmethod
-    def symbolic(_, x):
-        return _.op('grad::Sin', x)
-
-    @staticmethod
-    def forward(ctx, input):
-        return torch.cos(input)
-
-
-class CosGradOp(Function):
-    @staticmethod
-    def symbolic(_, x):
-        return _.op('grad::Cos', x)
-
-    @staticmethod
-    def forward(ctx, input):
-        return -torch.sin(input)
-
-
-class TanhGradOp(Function):
-    @staticmethod
-    def symbolic(_, x):
-        return _.op('grad::Tanh', x)
-
-    @staticmethod
-    def forward(ctx, input):
-        return 1 - torch.tanh(input)**2

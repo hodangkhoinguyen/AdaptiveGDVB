@@ -1,28 +1,13 @@
-#########################################################################
-##   This file is part of the auto_LiRPA library, a core part of the   ##
-##   α,β-CROWN (alpha-beta-CROWN) neural network verifier developed    ##
-##   by the α,β-CROWN Team                                             ##
-##                                                                     ##
-##   Copyright (C) 2020-2025 The α,β-CROWN Team                        ##
-##   Primary contacts: Huan Zhang <huan@huan-zhang.com> (UIUC)         ##
-##                     Zhouxing Shi <zshi@cs.ucla.edu> (UCLA)          ##
-##                     Xiangru Zhong <xiangru4@illinois.edu> (UIUC)    ##
-##                                                                     ##
-##    See CONTRIBUTORS for all author contacts and affiliations.       ##
-##                                                                     ##
-##     This program is licensed under the BSD 3-Clause License,        ##
-##        contained in the LICENCE file in this directory.             ##
-##                                                                     ##
-#########################################################################
 """ Bivariate operators"""
 import torch
 from torch import Tensor
 from typing import Dict, Optional
 from .base import *
 from .activation_base import BoundOptimizableActivation
-from .convex_concave import BoundSqrt
+from .nonlinear import BoundSqrt
 from .clampmult import multiply_by_A_signs
 from ..utils import *
+from .solver_utils import grb
 
 
 class MulHelper:
@@ -39,26 +24,13 @@ class MulHelper:
     def interpolated_relaxation(x_l: Tensor, x_u: Tensor,
                                 y_l: Tensor, y_u: Tensor,
                                 r_l: Optional[Tensor] = None,
-                                r_u: Optional[Tensor] = None,
-                                middle: bool = False,
+                                r_u: Optional[Tensor] = None
                                ) -> Tuple[Tensor, Tensor, Tensor,
                                           Tensor, Tensor, Tensor]:
         """Interpolate two optimal linear relaxations for optimizable bounds."""
         if r_l is None and r_u is None:
-            if middle:
-                # This option is equivalent to optimized linear relaxation
-                # with 0.5 as the fixed parameter.
-                # It interpolates two valid linear relaxations.
-                # See Appendix C in https://openreview.net/pdf?id=BJxwPJHFwS
-                alpha_l = (y_l - y_u) * 0.5 + y_u
-                beta_l = (x_l - x_u) * 0.5 + x_u
-                gamma_l = (y_u * x_u - y_l * x_l) * 0.5 - y_u * x_u
-                alpha_u = (y_u - y_l) * 0.5 + y_l
-                beta_u = (x_l - x_u) * 0.5 + x_u
-                gamma_u = (y_l * x_u - y_u * x_l) * 0.5 - y_l * x_u
-            else:
-                alpha_l, beta_l, gamma_l = y_l, x_l, -y_l * x_l
-                alpha_u, beta_u, gamma_u = y_u, x_l, -y_u * x_l
+            alpha_l, beta_l, gamma_l = y_l, x_l, -y_l * x_l
+            alpha_u, beta_u, gamma_u = y_u, x_l, -y_u * x_l
             return alpha_l, beta_l, gamma_l, alpha_u, beta_u, gamma_u
         else:
             assert isinstance(r_l, Tensor) and isinstance(r_u, Tensor)
@@ -78,7 +50,6 @@ class MulHelper:
                        opt_stage: Optional[str],
                        alphas: Optional[Dict[str, Tensor]],
                        start_name: Optional[str],
-                       middle: bool = False,
                       ) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor]:
         if opt_stage in ['opt', 'reuse']:
             assert x_l.ndim == y_l.ndim
@@ -87,8 +58,7 @@ class MulHelper:
             return MulHelper.interpolated_relaxation(
                 x_l, x_u, y_l, y_u, alphas[ns][:2], alphas[ns][2:4])
         else:
-            return MulHelper.interpolated_relaxation(
-                x_l, x_u, y_l, y_u, middle=middle)
+            return MulHelper.interpolated_relaxation(x_l, x_u, y_l, y_u)
 
     @staticmethod
     def get_forward_relaxation(x_l, x_u, y_l, y_u, opt_stage, alpha, start_name):
@@ -110,9 +80,6 @@ class BoundMul(BoundOptimizableActivation):
         super().__init__(attr, inputs, output_index, options)
         self.splittable = True
         self.mul_helper = MulHelper()
-        if options is None:
-            options = {}
-        self.middle = options.get('mul', {}).get('middle', False)
 
     def forward(self, x, y):
         self.x_shape = x.shape
@@ -122,7 +89,7 @@ class BoundMul(BoundOptimizableActivation):
     def get_relaxation_opt(self, x_l, x_u, y_l, y_u):
         return self.mul_helper.get_relaxation(
             x_l, x_u, y_l, y_u, self.opt_stage, getattr(self, 'alpha', None),
-            getattr(self, '_start', None), middle=self.middle)
+            self._start)
 
     def _init_opt_parameters_impl(self, size_spec, **kwargs):
         """Implementation of init_opt_parameters for each start_node."""
@@ -133,57 +100,12 @@ class BoundMul(BoundOptimizableActivation):
         alpha = torch.ones(4, size_spec, *shape, device=x_l.device)
         return alpha
 
-    def _is_softmax(self):
-        """This multiplication comes from softmax.
-
-        It is the division converted to BoundMul + BoundReciprocal.
-        """
-        return (
-            self.from_complex_node == 'BoundSoftmax'
-            and type(self.inputs[0]).__name__ == 'BoundExp'
-            and type(self.inputs[1]).__name__ == 'BoundReciprocal'
-            and type(self.inputs[1].inputs[0]).__name__ == 'BoundReduceSum'
-            and type(self.inputs[1].inputs[0].inputs[0]).__name__ == 'BoundExp')
-
     def bound_relax(self, x, y, init=False, dim_opt=None):
         if init:
             pass
         (alpha_l, beta_l, gamma_l,
          alpha_u, beta_u, gamma_u) = self.get_relaxation_opt(
             x.lower, x.upper, y.lower, y.upper)
-
-        # Check NaN which can happen in softmax if Exp's bounds are too loose
-        if self._is_softmax():
-            assert alpha_l.shape[:-1] == beta_l.shape[:-1]
-            assert alpha_l.shape[-1] == 1 or alpha_l.shape[-1] == beta_l.shape[-1]
-            assert beta_l.shape == gamma_l.shape
-            mask = (alpha_l.isnan().expand(beta_l.shape)
-                    | alpha_l.isinf().expand(beta_l.shape)
-                    | beta_l.isnan() | beta_l.isinf()
-                    | gamma_l.isnan() | gamma_l.isinf())
-            if mask.any():
-                alpha_l = alpha_l.clone()
-                alpha_l[mask.any(dim=-1)] = 0
-                beta_l = beta_l.clone()
-                beta_l[mask] = 0
-                gamma_l = gamma_l.clone()
-                gamma_l[mask] = 0
-
-            assert alpha_u.shape[:-1] == beta_u.shape[:-1]
-            assert alpha_u.shape[-1] == 1 or alpha_u.shape[-1] == beta_u.shape[-1]
-            assert beta_u.shape == gamma_u.shape
-            mask = (alpha_u.isnan().expand(beta_u.shape)
-                    | alpha_u.isinf().expand(beta_u.shape)
-                    | beta_u.isnan() | beta_u.isinf()
-                    | gamma_u.isnan() | gamma_u.isinf())
-            if mask.any():
-                alpha_u = alpha_u.clone()
-                alpha_u[mask.any(dim=-1)] = 0
-                beta_u = beta_u.clone()
-                beta_u[mask] = 0
-                gamma_u = gamma_u.clone()
-                gamma_u[mask] = 1.
-
         self.lw = [alpha_l, beta_l]
         self.lb = gamma_l
         self.uw = [alpha_u, beta_u]
@@ -196,7 +118,7 @@ class BoundMul(BoundOptimizableActivation):
         elif isinstance(x, Patches):
             # Multiplies patches by a const. Assuming const is a tensor, and it must be in nchw format.
             assert isinstance(const, torch.Tensor) and const.ndim == 4
-            if (const.size(0) == 1 or const.size(0) == x.patches.size(1)) and const.size(1) == x.patches.size(-3) and const.size(2) == const.size(3) == 1:
+            if const.size(0) == x.patches.size(1) and const.size(1) == x.patches.size(-3) and const.size(2) == const.size(3) == 1:
                 # The case that we can do channel-wise broadcasting multiplication
                 # Shape of const: (batch, in_c, 1, 1)
                 # Shape of patches when unstable_idx is None: (spec, batch, in_c, patch_h, patch_w)
@@ -373,11 +295,7 @@ class BoundMul(BoundOptimizableActivation):
             else:
                 assert False
         else:
-            lower, upper = self.interval_propagate_both_perturbed(x, y)
-            if self._is_softmax():
-                lower = lower.clamp(min=0)
-                upper = upper.clamp(max=1)
-            return lower, upper
+            return self.interval_propagate_both_perturbed(x, y)
 
     @staticmethod
     def interval_propagate_both_perturbed(*v):
@@ -396,7 +314,6 @@ class BoundMul(BoundOptimizableActivation):
         r0, r1, r2, r3 = x[0] * y[0], x[0] * y[1], x[1] * y[0], x[1] * y[1]
         lower = torch.min(torch.min(r0, r1), torch.min(r2, r3))
         upper = torch.max(torch.max(r0, r1), torch.max(r2, r3))
-
         return lower, upper
 
     def build_solver(self, *v, model, C=None, model_type="mip", solver_pkg="gurobi"):
@@ -420,8 +337,7 @@ class BoundMul(BoundOptimizableActivation):
         else:
             # Both inputs are perturbed. Need relaxation.
             self.requires_input_bounds = [0, 1]
-            if not self.force_not_splittable:
-                self.splittable = True
+            self.splittable = True
 
 
 class BoundDiv(Bound):
@@ -439,4 +355,5 @@ class BoundDiv(Bound):
             sqrt = torch.sqrt(1. / n * (s + 1))
             return torch.sign(dev) * (1. / sqrt)
 
+        self.x, self.y = x, y
         return x / y

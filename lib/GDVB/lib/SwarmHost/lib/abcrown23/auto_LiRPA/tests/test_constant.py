@@ -52,7 +52,6 @@ class TestConstant(TestCase):
         assert lb.shape == ub.shape == torch.Size((2, 10))
 
         self.result = (lb, ub)
-        self.rtol = 5e-4
         self.check()
 
 if __name__ == '__main__':

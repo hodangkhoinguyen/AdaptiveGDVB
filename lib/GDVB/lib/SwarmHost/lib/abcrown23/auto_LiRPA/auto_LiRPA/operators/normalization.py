@@ -1,28 +1,9 @@
-#########################################################################
-##   This file is part of the auto_LiRPA library, a core part of the   ##
-##   α,β-CROWN (alpha-beta-CROWN) neural network verifier developed    ##
-##   by the α,β-CROWN Team                                             ##
-##                                                                     ##
-##   Copyright (C) 2020-2025 The α,β-CROWN Team                        ##
-##   Primary contacts: Huan Zhang <huan@huan-zhang.com> (UIUC)         ##
-##                     Zhouxing Shi <zshi@cs.ucla.edu> (UCLA)          ##
-##                     Xiangru Zhong <xiangru4@illinois.edu> (UIUC)    ##
-##                                                                     ##
-##    See CONTRIBUTORS for all author contacts and affiliations.       ##
-##                                                                     ##
-##     This program is licensed under the BSD 3-Clause License,        ##
-##        contained in the LICENCE file in this directory.             ##
-##                                                                     ##
-#########################################################################
 """ Normalization operators"""
 import copy
 
 import torch
-import torch.nn as nn
 
 from .base import *
-from .constant import BoundConstant
-from .leaf import BoundParams
 from .solver_utils import grb
 
 
@@ -91,8 +72,18 @@ class BoundBatchNormalization(Bound):
             weight = torch.ones_like(weight)
             bias = torch.zeros_like(bias)
 
+
         tmp_bias = bias - self.current_mean / torch.sqrt(self.current_var + self.eps) * weight
         tmp_weight = weight / torch.sqrt(self.current_var + self.eps)
+
+        # for debug: this checking is passed, i.e., we derived the forward bound
+        # from the following correct computation procedure
+        # tmp_x = ((x[0].lb + x[0].ub) / 2.).detach()
+        # expect_output = self(tmp_x, *[_.lower for _ in x[1:]])
+        # tmp_weight = tmp_weight.view(*((1, -1) + (1,) * (tmp_x.ndim - 2)))
+        # tmp_bias = tmp_bias.view(*((1, -1) + (1,) * (tmp_x.ndim - 2)))
+        # computed_output = tmp_weight * tmp_x + tmp_bias
+        # assert torch.allclose(expect_output, computed_output, 1e-5, 1e-5)
 
         tmp_weight = tmp_weight.view(*((1, 1, -1) + (1,) * (inp.lw.ndim - 3)))
         new_lw = torch.clamp(tmp_weight, min=0.) * inp.lw + torch.clamp(tmp_weight, max=0.) * inp.uw
@@ -113,18 +104,8 @@ class BoundBatchNormalization(Bound):
         assert not self.is_input_perturbed(1) and not self.is_input_perturbed(2), \
             'Weight perturbation is not supported for BoundBatchNormalization'
 
-        def get_param(p):
-            if isinstance(p, BoundConstant):
-                # When affine is disabled in BN
-                return p.value
-            elif isinstance(p, BoundParams):
-                return p.param
-            else:
-                raise TypeError(p)
-
         # x[0]: input, x[1]: weight, x[2]: bias, x[3]: running_mean, x[4]: running_var
-        weight = get_param(x[1])
-        bias = get_param(x[2])
+        weight, bias = x[1].param, x[2].param
         if not self.training:
             self.current_mean = x[3].value
             self.current_var = x[4].value
@@ -200,6 +181,7 @@ class BoundBatchNormalization(Bound):
         uA, ubias = _bound_oneside(last_uA)
 
         return [(lA, uA), (None, None), (None, None), (None, None), (None, None)], lbias, ubias
+
 
     def interval_propagate(self, *v):
         assert not self.is_input_perturbed(1) and not self.is_input_perturbed(2), \
@@ -298,33 +280,3 @@ class BoundBatchNormalization(Bound):
 
     def update_requires_input_bounds(self):
         self._check_weight_perturbation()
-
-
-class LayerNormImpl(nn.Module):
-    def __init__(self, axis, epsilon):
-        super().__init__()
-        self.axis = axis
-        self.epsilon = epsilon
-
-    def forward(self, x, scale, bias):
-        mean = x.mean(self.axis, keepdim=True)
-        d = x - mean
-        dd = d**2
-        var = dd.mean(self.axis, keepdim=True)
-        var_eps = var + self.epsilon
-        std_dev = torch.sqrt(var_eps)
-        inv_std_dev = torch.reciprocal(std_dev)
-        normalized = d * inv_std_dev
-        normalized_scaled = normalized * scale + bias
-        return normalized_scaled
-
-
-class BoundLayerNormalization(Bound):
-    def __init__(self, attr, inputs, output_index, options):
-        super().__init__(attr, inputs, output_index, options)
-        self.complex = True
-        self.model = LayerNormImpl(self.attr['axis'], self.attr['epsilon'])
-
-    def forward(self, x, scale, bias):
-        self.input = (x, scale, bias)
-        return self.model(x, scale, bias)

@@ -17,17 +17,20 @@ class TestJacobian(TestCase):
             generate=generate)
 
     def test(self):
-        in_dim, linear_size = 8, 100
+        in_dim, width, linear_size = 8, 2, 8
         model = nn.Sequential(
+            nn.Conv2d(3, width, 3, stride=1, padding=0),
+            nn.ReLU(),
+            nn.Conv2d(width, width, 3, stride=1, padding=0),
+            nn.ReLU(),
             Flatten(),
-            nn.Linear(3*in_dim**2, linear_size),
+            nn.Linear(width * (in_dim-4)**2, linear_size),
             nn.ReLU(),
-            nn.Linear(linear_size, linear_size),
-            nn.ReLU(),
-            nn.Linear(linear_size, 10),
+            nn.Linear(linear_size, 10)
         )
         x0 = torch.randn(1, 3, in_dim, in_dim)
-        self.result = compute_jacobians(model, x0)
+        self.result = compute_jacobians(
+            model, x0, bound_opts={'optimize_bound_args': {'iteration': 2}})
         self.check()
 
 
