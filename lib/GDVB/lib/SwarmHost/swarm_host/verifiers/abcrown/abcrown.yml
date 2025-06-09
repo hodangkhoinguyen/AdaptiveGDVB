@@ -1,29 +1,3 @@
 # default config example
 general:
-    #enable_incomplete_verification: true
-    complete_verifier: bab
-    # device: cpu #cuda
     device: cuda #cuda
-data:
-   dataset: MNIST
-   start: 0
-   end: 1
-specification:
-   norm: .inf  # Linf norm (can also be 2 or 1).
-   epsilon: 0.001  # epsilon=0.02.
-solver:
-    bound_prop_method: alpha-crown
-    batch_size: 1 # to fit gpu
-    beta-crown:
-        beta: false  # true: to enable beta-crown
-bab:
-    # max_domains: 100000
-    # get_upper_bound: False  # Needed to be TRUE for Bab-Attack.
-    # batched_domain_list: False  # Needed to be FALSE for BaB-Attack.
-    branching:
-        method: babsr #fsb kfsb
-        reduceop: max
-    attack: # bab-attack
-        enabled: False
-attack: # pgd-attack
-    pgd_order: before
