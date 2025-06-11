@@ -125,10 +125,10 @@ def make_input_box_dict(num_inputs):
 
     return rv
 
-def get_io_nodes(onnx_model):
+def get_io_nodes(onnx_filename):
     'returns 3 -tuple: input node, output nodes, input dtype'
-
-    sess = ort.InferenceSession(onnx_model.SerializeToString())
+    onnx_model = onnx.load(onnx_filename)
+    sess = ort.InferenceSession(onnx_filename)
     inputs = [i.name for i in sess.get_inputs()]
     assert len(inputs) == 1, f"expected single onnx network input, got: {inputs}"
     input_name = inputs[0]
@@ -153,7 +153,7 @@ def get_num_inputs_outputs(onnx_filename):
     'get num inputs, num outputs, and input dtype of an onnx file'
 
     onnx_model = onnx.load(onnx_filename)
-    inp, out, inp_dtype = get_io_nodes(onnx_model)
+    inp, out, inp_dtype = get_io_nodes(onnx_filename)
     
     inp_shape = tuple(d.dim_value if d.dim_value != 0 else 1 for d in inp.type.tensor_type.shape.dim)
     out_shape = tuple(d.dim_value if d.dim_value != 0 else 1 for d in out.type.tensor_type.shape.dim)

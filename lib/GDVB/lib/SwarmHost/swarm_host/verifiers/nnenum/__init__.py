@@ -22,6 +22,7 @@ class NNEnum(Verifier):
             lines = fp.readlines()
 
         veri_ans, veri_time = super().pre_analyze(lines)
+        iteration_count = 0
 
         if not (veri_ans and veri_time):
             for l in lines:
@@ -29,6 +30,9 @@ class NNEnum(Verifier):
                     veri_ans = "unsat"
                 elif "Result: network is UNSAFE with confirmed counterexample" in l:
                     veri_ans = "sat"
+
+                if "Total Stars: " in l:
+                    iteration_count = int(l.strip().split()[2])
 
                 if "Runtime:" in l:
                     if "(" not in l:
@@ -47,7 +51,8 @@ class NNEnum(Verifier):
                 error_pattern = [
                     "FloatingPointError: underflow encountered in multiply",
                     "underflow encountered in divide",
-                    "FloatingPointError: overflow encountered in float_scalars"
+                    "FloatingPointError: overflow encountered in float_scalars",
+                    "The search was prematurely terminated due to the solver"
                 ]
                 if any([True for x in error_pattern if x in l]):
                     veri_ans = "error"
@@ -60,4 +65,4 @@ class NNEnum(Verifier):
             veri_ans and veri_time
         ), f"Answer: {veri_ans}, time: {veri_time}, log: {self.verification_problem.paths['veri_log_path']}"
         
-        return super().post_analyze(veri_ans, veri_time)
+        return super().post_analyze(veri_ans, veri_time, iteration_count)
