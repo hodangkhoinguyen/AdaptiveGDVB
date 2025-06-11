@@ -35,6 +35,7 @@ class NeuralSat(Verifier):
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:
             lines = fp.readlines()
         veri_ans, veri_time = super().pre_analyze(lines)
+        iteration_count = 0
 
         if not (veri_ans and veri_time):
             veri_ans = None
@@ -56,13 +57,15 @@ class NeuralSat(Verifier):
                     veri_ans = l.strip().split()[-1]
                 elif "[!] Runtime:" in l:
                     veri_time = float(l.strip().split()[-1])
-                
-                if veri_ans and veri_time:
-                    break
+                elif "[!] Iterations:" in l:
+                    iteration_count = int(l.strip().split()[-1])
+ 
+                # if veri_ans and veri_time:
+                #     break
         assert (
             veri_ans and veri_time
         ), f"Answer: {veri_ans}, time: {veri_time}, log: {self.verification_problem.paths['veri_log_path']}"
-        return super().post_analyze(veri_ans, veri_time)
+        return super().post_analyze(veri_ans, veri_time, iteration_count)
 
 '''
 class NeuralSatP(Verifier):

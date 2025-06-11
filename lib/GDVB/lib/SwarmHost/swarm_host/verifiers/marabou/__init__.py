@@ -24,6 +24,7 @@ class Marabou(Verifier):
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:
             lines = fp.readlines()
         veri_ans, veri_time = super().pre_analyze(lines)
+        iteration_count = 0
 
         if not (veri_ans and veri_time):
             veri_ans = None
@@ -37,10 +38,12 @@ class Marabou(Verifier):
                     veri_time = float(l.strip().split()[-1])
                 elif "RuntimeError" in l:
                     veri_ans = "error"
+                elif "Total depth is" in l:
+                    iteration_count = int(l.strip().split()[3][:-1])
                 
-                if veri_ans and veri_time:
-                    break
+                # if veri_ans and veri_time:
+                #     break
         assert (
             veri_ans and veri_time
         ), f"Answer: {veri_ans}, time: {veri_time}, log: {self.verification_problem.paths['veri_log_path']}"
-        return super().post_analyze(veri_ans, veri_time)
+        return super().post_analyze(veri_ans, veri_time, iteration_count)

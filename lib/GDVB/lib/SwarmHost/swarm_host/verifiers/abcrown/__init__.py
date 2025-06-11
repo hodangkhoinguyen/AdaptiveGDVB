@@ -48,6 +48,7 @@ class ABCrown(Verifier):
             lines = fp.readlines()
         lines = self.reformat_lines(lines)
         veri_ans, veri_time = super().pre_analyze(lines)
+        iteration_count = 0
 
         if not (veri_ans and veri_time):
             veri_ans = None
@@ -74,13 +75,18 @@ class ABCrown(Verifier):
                     veri_time = -1
                 elif "TORCH_USE_CUDA_DSA" in l:
                     veri_ans = 'error'
-                    veri_time = -1            
+                    veri_time = -1
+                elif "RuntimeError: " in l:
+                    veri_ans = 'memout'
+                    veri_time = -1
+                elif "BaB round" in l:
+                    iteration_count += 1
 
-                if veri_ans and veri_time:
-                    break
+                # if veri_ans and veri_time:
+                #     break
 
         assert (
             veri_ans and veri_time
         ), f"Answer: {veri_ans}, time: {veri_time}, log: {self.verification_problem.paths['veri_log_path']}"
         
-        return super().post_analyze(veri_ans, veri_time)
+        return super().post_analyze(veri_ans, veri_time, iteration_count)
