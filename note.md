@@ -16,3 +16,6 @@
 ### Marabou
 - find a way to work around
 conda run -n swarmhost python -m swarm_host $@
+
+###
+- Integrate with ReluSplitter
