@@ -53,6 +53,9 @@ class NeuralSat(Verifier):
                 # elif "RuntimeError" in l:
                 #     veri_ans = 'error'
                 #     veri_time = -1
+                elif "Gurobi error: Model too large for size-limited license" in l:
+                    veri_ans = 'memout'
+                    veri_time = -1
                 elif "[!] Result:" in l:
                     veri_ans = l.strip().split()[-1]
                 elif "[!] Runtime:" in l:
