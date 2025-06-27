@@ -30,8 +30,6 @@ class NeuralSat(Verifier):
         self.execute(cmd, log_path, time)
 
     def analyze(self):
-        cmd =f'cp {self.verification_problem.paths["veri_log_path"]} test_dir'
-        os.system(cmd)
         with open(self.verification_problem.paths["veri_log_path"], "r") as fp:
             lines = fp.readlines()
         veri_ans, veri_time = super().pre_analyze(lines)
