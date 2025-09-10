@@ -138,14 +138,14 @@ class EvoStep:
                     answers_per_verifiers[verifier] = np.empty(
                         shape + (nb_property,), dtype=np.int32
                     )
-                    times_per_verifiers[verifier] = np.zeros(shape, dtype=np.int32)
+                    times_per_verifiers[verifier] = np.zeros(shape, dtype=np.float32)
 
                 idx = tuple(indexes[x].index(problem.vpc[x]) for x in self.evo_params)
                 if problem.verification_results[verifier][0] in ["sat", "unsat"]:
                     solved_per_verifiers[verifier][idx] += 1
-                times_per_verifiers[verifier][idx] = problem.verification_results[
+                times_per_verifiers[verifier][idx] += problem.verification_results[
                     verifier
-                ][1]
+                ][1] / nb_property
                 prop_id = problem.vpc["prop"]
                 answer_code = benchmark.settings.answer_code[
                     problem.verification_results[verifier][0]
