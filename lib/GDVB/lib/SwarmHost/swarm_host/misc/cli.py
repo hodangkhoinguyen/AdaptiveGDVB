@@ -87,5 +87,28 @@ def parse_args():
     parser.add_argument('--p_mrb',action='store_true',help="Create Local Robustness based on model's output instead of label ground truth.")
     parser.add_argument('--p_mean', metavar='N', type=float, nargs='+',help='Mean of artifact')
     parser.add_argument('--p_std', metavar='N', type=float, nargs='+',help='Std of artifact')
+    parser.add_argument(
+        '--p_margin_aware',
+        action='store_true',
+        help="Select the property center point by this network's own "
+        "prediction margin instead of a raw dataset index, so property "
+        "difficulty is calibrated per trained network rather than left to "
+        "which image happened to land at a given index.",
+    )
+    parser.add_argument(
+        '--p_margin_pool_size',
+        type=int,
+        default=100,
+        help='Candidate image pool size to rank by margin (only used with --p_margin_aware).',
+    )
+    parser.add_argument(
+        '--p_margin_band',
+        metavar='Q',
+        type=float,
+        nargs=2,
+        default=[0.0, 0.3],
+        help='Margin-quantile band [lo, hi] to select candidates from, 0=smallest '
+        '(hardest) margin in the pool (only used with --p_margin_aware).',
+    )
 
     return parser.parse_args()

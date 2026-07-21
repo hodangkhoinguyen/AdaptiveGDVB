@@ -5,6 +5,7 @@ from ..verifiers.nnenum import NNEnum
 from ..verifiers.neuralsat import NeuralSat
 from ..verifiers.veristable import VeriStable
 from ..verifiers.marabou import Marabou
+from ..verifiers.pyrat import PyRAT
 
 from .property import Property, LocalRobustnessProperty
 
@@ -67,6 +68,8 @@ class VerificationProblem:
                 v = VeriStable(self)
             case 'marabou':
                 v = Marabou(self)
+            case 'pyrat':
+                v = PyRAT(self)
             case _:
                 raise NotImplementedError(verifier)
         self.verifier = v
@@ -79,7 +82,7 @@ class VerificationProblem:
     def generate_property(self, format="vnnlib", model_path=None):
         self.logger.info(f"Generating property ... ")
         
-        if type(self.verifier) in [ABCrown, MNBab, Verinet, NNEnum, NeuralSat, VeriStable, Marabou]:
+        if type(self.verifier) in [ABCrown, MNBab, Verinet, NNEnum, NeuralSat, VeriStable, Marabou, PyRAT]:
             assert self.property_configs["type"] == "local robustness"
             self.property = LocalRobustnessProperty(self.logger, self.property_configs)
             self.property.generate(self.paths["prop_dir"], format=format, model_path=model_path)

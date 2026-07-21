@@ -20,7 +20,10 @@ def main():
         "clip": args.p_clip,
         "mean": args.p_mean,
         'std': args.p_std,
-        'mrb': args.p_mrb
+        'mrb': args.p_mrb,
+        'margin_aware': args.p_margin_aware,
+        'margin_pool_size': args.p_margin_pool_size,
+        'margin_band': tuple(args.p_margin_band),
     }
     
     verifier_config = {

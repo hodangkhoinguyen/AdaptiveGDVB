@@ -250,7 +250,8 @@ This section describes the parameters used in the configuration file of AdaGDVB 
                   'neuralsat',
                   'mnbab',
                   'nnenum',
-                  'verinet']
+                  'verinet',
+                  'pyrat']
    
       # ways to dispatch verification tasks
       [verify.dispatch]
@@ -280,7 +281,96 @@ This section describes the parameters used in the configuration file of AdaGDVB 
       parameters_lower_bounds = {'fc'='1/3', 'neu'='1/3'}
       # the level(scaling factor) upper bound of each factor
       parameters_upper_bounds = {'fc'='128/3', 'neu'='24'}
+
+      # (optional) range-search strategy during Exploration.
+      # 'geometric' (default): the original inflation/deflation doubling and
+      #   halving of the factor ranges.
+      # 'active': fits the empirical solve-rate curve for each factor from
+      #   all iterations collected so far and centers the next range on
+      #   where it estimates the curve crosses `boundary_threshold`, instead
+      #   of blindly doubling/halving. Falls back to the geometric action
+      #   for a factor until there is a crossing to estimate from.
+      search_strategy = 'geometric'
+      # (optional, 'active' strategy only) shrink factor applied to the
+      # current range width to size the window around an estimated crossing.
+      active_shrink_rate = 0.5
+
+      # (optional) solve-rate threshold defining the Verification
+      # Performance Boundary. Unset (default): the legacy pivot rule is
+      # used (an exact full solve for the under-approximation pivot, and a
+      # hardcoded ">2 solved" cutoff for the over-approximation pivot).
+      # Set to a float in (0, 1]: both pivots are instead defined by this
+      # single, configurable solve-rate crossing. Required (defaults to
+      # 0.5 if unset) whenever `search_strategy = 'active'` or
+      # `differential_verifiers` is set, since neither has a legacy
+      # equivalent.
+      boundary_threshold = 0.5
+
+      # (optional, requires boundary_threshold/active/differential mode)
+      # confidence level in (0, 1) for treating a point's solve-rate
+      # estimate as evidence in the pivot search. With a small nb_property
+      # sample, a raw rate (e.g. "3 out of 5 properties solved") is noisy
+      # and can flip a pivot between iterations from sampling noise alone.
+      # When set, each point's rate is instead given a Wilson score
+      # interval, and only points whose interval clears the threshold with
+      # this confidence count as confirmed-passing or confirmed-failing;
+      # ambiguous points contribute no evidence, so a pivot only forms once
+      # there is enough data to be confident about it. Unset (default):
+      # compare point estimates directly, as above.
+      boundary_confidence = 0.9
+
+      # (optional) search for the region where two verifiers *disagree*
+      # (a "differential" VPB) instead of one verifier's own boundary. Must
+      # name exactly two verifiers already listed under [verify.verifiers].
+      # The search window is the union of each verifier's own transition
+      # zone, which is guaranteed to contain every point where they can
+      # disagree; the per-property disagreement rate itself is logged each
+      # iteration.
+      differential_verifiers = ['abcrown', 'neuralsat']
+
+      # (optional) which conclusive verifier answers count as "solved" when
+      # computing solve rate for the pivot search (both the legacy rule and
+      # the threshold-based rule above). Default: sat or unsat. A sat
+      # instance is falsified by finding a single counterexample, which
+      # tends to be fast regardless of network size, so including it dilutes
+      # the solve-rate signal used to locate the boundary. Set to ['unsat']
+      # to focus the VPB specifically on proving difficulty, which is where
+      # a complete verifier's scaling behavior actually shows up.
+      success_answers = ['unsat']
+
+      # (optional) audit every pair of verifiers that actually produced
+      # results each iteration for genuine sat/unsat contradictions -- one
+      # verifier proves a property, another finds a counterexample to the
+      # *same* network+property -- as opposed to a mere capability gap
+      # (one solves, the other times out). Runs over every verifier listed
+      # under [verify.verifiers], independent of `differential_verifiers`;
+      # it only logs a warning with the offending indices, it never changes
+      # the search. A contradiction is not proof of a soundness bug by
+      # itself -- it can also come from floating-point precision at the
+      # property boundary or a benchmark-generation issue -- so treat a hit
+      # as something to investigate manually, not a confirmed defect.
+      check_consistency = true
    ```
+
+   **Comparing verifier versions.** `differential_verifiers` is not limited to
+   different tools -- SwarmHost already registers separate verifier names per
+   `abcrown` release (`abcrown22`, `abcrown23`, `abcrown24`, `abcrown25`, see
+   `lib/GDVB/gdvb/pipeline/SwarmHost.py`), and per-version configs already
+   exist (`configs/M_abcrown22.toml` .. `M_abcrown25.toml`). Listing two
+   versions together searches for exactly where the boundary shifted between
+   releases:
+   ```toml
+   [verify.verifiers]
+      SwarmHost = ['abcrown22', 'abcrown25']
+
+   [evolutionary]
+      differential_verifiers = ['abcrown22', 'abcrown25']
+   ```
+   To compare more than two versions, either run this pairwise per version
+   pair, or run each version separately in single-verifier mode and compare
+   the resulting UA/OA pivots afterward -- the latter avoids the two-verifier
+   limit and is simpler when the goal is just "does the boundary move over
+   time" rather than pinpointing where two specific versions disagree.
 
 ## V. Result Replication
 It is important to note that the extensive research detailed in the paper required a significant amount of time of more than thousands of CPU hours, spanning across multiple server clusters equipped with GPUs. The identification of the VPBs of four verifiers (abcrown, neuralsat, neurify, and marabou) involved over 600 training tasks and 3400 verification tasks. It is highly recommended to have substantial resources available before attempting to replicate this study. The provided script will execute the complete study as outlined in the paper.

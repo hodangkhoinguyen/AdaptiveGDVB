@@ -14,7 +14,7 @@ learning_rate=1e-3
 
 [distillation.data]
 format="mnist"
-batchsize=64
+batchsize=256
 presized=false
 path="./data/mnist"
 

@@ -48,9 +48,9 @@ class NeuralSat(Verifier):
                 elif "CUDA out of memory" in l:
                     veri_ans = 'memout'
                     veri_time = -1
-                # elif "RuntimeError" in l:
-                #     veri_ans = 'error'
-                #     veri_time = -1
+                elif "Falling back to ['CPUExecutionProvider'] and retrying." in l:
+                    veri_ans = 'hardware_limit'
+                    veri_time = -1
                 elif "Gurobi error: Model too large for size-limited license" in l:
                     veri_ans = 'memout'
                     veri_time = -1

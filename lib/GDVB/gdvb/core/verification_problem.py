@@ -493,21 +493,35 @@ class VerificationProblem:
             p_mean = " ".join(str(x) for x in data_config["mean"])
             p_std = " ".join(str(x) for x in data_config["std"])
 
-            cmd = verifier.execute(
-                [
-                    f"--onnx {self.dis_model_path}",
-                    f"--artifact {self.verification_benchmark.artifact.__name__}",
-                    f"--property_id {prop_id}",
-                    f"--eps {eps}",
-                    f"--property_dir {self.prop_dir}",
-                    f"--veri_config_path {self.veri_config_path}",
-                    f"-t {time_limit}",
-                    f"--p_mean {p_mean}",
-                    f"--p_std {p_std}",
-                    f"--p_mrb",
-                    # f"--p_clip",
-                ]
-            )
+            swarmhost_params = [
+                f"--onnx {self.dis_model_path}",
+                f"--artifact {self.verification_benchmark.artifact.__name__}",
+                f"--property_id {prop_id}",
+                f"--eps {eps}",
+                f"--property_dir {self.prop_dir}",
+                f"--veri_config_path {self.veri_config_path}",
+                f"-t {time_limit}",
+                f"--p_mean {p_mean}",
+                f"--p_std {p_std}",
+                f"--p_mrb",
+                # f"--p_clip",
+            ]
+            # (optional) select property center points by the trained
+            # network's own margin instead of a raw dataset index -- see
+            # swarm_host/core/property.py:_select_margin_aware_id. Off
+            # unless explicitly set under [verify] in the AdaGDVB config,
+            # since it changes which literal image each prop level maps to.
+            if configs_v.get("margin_aware_properties", False):
+                swarmhost_params += ["--p_margin_aware"]
+                if "margin_pool_size" in configs_v:
+                    swarmhost_params += [
+                        f"--p_margin_pool_size {configs_v['margin_pool_size']}"
+                    ]
+                if "margin_band" in configs_v:
+                    lo, hi = configs_v["margin_band"]
+                    swarmhost_params += [f"--p_margin_band {lo} {hi}"]
+
+            cmd = verifier.execute(swarmhost_params)
         else:
             raise NotImplementedError
         cmds = [cmd]

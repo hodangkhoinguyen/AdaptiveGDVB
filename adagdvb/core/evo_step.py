@@ -33,6 +33,7 @@ class EvoStep:
         iteration,
         logger,
         critical_region_analysis,
+        success_answers=("sat", "unsat"),
     ):
         self.logger = logger
         self.benchmark = benchmark
@@ -42,6 +43,13 @@ class EvoStep:
         self.direction = direction
         self.nb_solved = None
         self.answers = None
+        # which conclusive verifier answers count as "solved" for VPB search
+        # purposes. Default (sat or unsat) matches the original behavior; set
+        # to ("unsat",) to focus the boundary on proving difficulty only,
+        # since sat instances (falsified by finding a counterexample) tend to
+        # resolve quickly regardless of network size and so dilute the
+        # solve-rate signal used to locate the boundary.
+        self.success_answers = tuple(success_answers)
         # TODO: only support one verifier at a time
         self.verifier = list(
             benchmark.settings.verification_configs["verifiers"].values()
@@ -141,7 +149,7 @@ class EvoStep:
                     times_per_verifiers[verifier] = np.zeros(shape, dtype=np.float32)
 
                 idx = tuple(indexes[x].index(problem.vpc[x]) for x in self.evo_params)
-                if problem.verification_results[verifier][0] in ["sat", "unsat"]:
+                if problem.verification_results[verifier][0] in self.success_answers:
                     solved_per_verifiers[verifier][idx] += 1
                 times_per_verifiers[verifier][idx] += problem.verification_results[
                     verifier

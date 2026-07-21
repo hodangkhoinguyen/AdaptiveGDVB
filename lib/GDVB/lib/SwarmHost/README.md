@@ -33,6 +33,41 @@ A list of supported [VERIFIER]s and their [VERIFIER_REPO_LINK]s are shown as fol
 > [verinet]
 > [neuralsat]
 > [veristable]
+> [PyRAT](https://git.frama-c.com/pub/pyrat) (see note below -- proprietary CEA license)
+
+##### PyRAT-specific setup
+PyRAT's source is proprietary (CEA license) but the repository is publicly
+cloneable; review the license at [pyrat-analyzer.com](https://pyrat-analyzer.com/)
+before depending on it.
+
+```shell
+mkdir -p lib
+git clone https://git.frama-c.com/pub/pyrat.git lib/pyrat
+cd lib/pyrat
+conda env create --name pyrat -f ../../envs/pyrat.yml
+conda run -n pyrat pip install -e .
+```
+
+Verified working with `python=3.10.17`; other minor versions may hit a "bad
+magic number" error since PyRAT ships precompiled `.pyc` bytecode tied to a
+specific CPython build. If `numpy>=2.0` gets pulled in by another dependency,
+downgrade it (`pip install "numpy<2.0"`) -- PyRAT's own `pyproject.toml`
+requires `numpy<2.0`.
+
+Smoke-test the install:
+```shell
+conda run -n pyrat pyrat --model_path <abs path to .onnx> --property_path <abs path to .vnnlib> --timeout 30 --domains poly
+```
+It prints a line like `Result = True, Time = 0.04 s, Safe space = 0.00 %,
+number of analysis = 1` -- this is what `swarm_host/verifiers/pyrat` parses.
+`Result` is one of PyRAT's own status values (`True`/`False`/`Unknown`/
+`Error`/`Timeout`), mapped to `unsat`/`sat`/`unknown`/`error`/`timeout`
+respectively (`True` = property holds/no counterexample = unsat; `False` =
+counterexample found = sat).
+
+Use **absolute paths** for `--model_path`/`--property_path`/`--log_dir` --
+PyRAT resolves relative paths against its own install directory rather than
+the caller's working directory, which is easy to get bitten by.
 
 ### III. Get miscellaneous tools
 Download the resource monitor from the DNNV framework.
