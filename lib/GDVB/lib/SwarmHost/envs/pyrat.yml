@@ -1,0 +1,38 @@
+# PyRAT's own recommended environment (from its `pyrat_env.yml`), renamed to
+# match this repo's `conda env create --name [VERIFIER] -f envs/[VERIFIER].yml`
+# convention. Assumes a CUDA-capable machine (pytorch/nvidia channels); if
+# running on a CPU-only machine, drop the `pytorch-cuda` line and instead
+# install torch/torchvision from https://download.pytorch.org/whl/cpu after
+# creating the env -- this was verified to work for a CPU-only smoke test.
+name: pyrat
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10.17
+  - loguru
+  - tqdm
+  - onnxruntime
+  - pip=21.2.4
+  - onnx
+  - psutil
+  - pytest
+  - pillow
+  - pytorch:torchvision
+  - pytorch:pytorch>=2.2
+  - pytorch:pytorch-cuda=11.8
+  - gitpython
+  - matplotlib
+  - pyvis
+  - configargparse
+  - pydocstyle
+  - protobuf
+  - "numpy>=1.22.3,<2.0"
+  - pip:
+      - tensorflow>=2.7
+      - cvxpy[CBC]>=1.2.0
+      - onnxsim
+      - networkx
+      - pyparsing
+      - trace-events
